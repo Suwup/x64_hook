@@ -1,20 +1,18 @@
 // Compiled with:
 // cl /O2 example.c -WX -Wall -wd4710 -wd5045 /link bddisasm.lib
 
-#define NOINLINE __declspec(noinline)
-#define WIN32_MEAN_AND_LEAN
-
 #pragma warning(push, 0)
-#include <windows.h>
 #include <assert.h>
 #include <stdio.h>
 
 #include "bddisasm/bddisasm.h"
 #pragma warning(pop)
 
+// Just so we don't have to set the include path for the example.
+#define X64_HOOK_BDDISASM_ALREADY_INCLUDED
+
 #define X64_HOOK_ASSERT(x) assert(x)
 #define X64_HOOK_DEBUG 1
-#define X64_HOOK_BDDISASM_ALREADY_INCLUDED
 
 #include "x64_hook.h"
 

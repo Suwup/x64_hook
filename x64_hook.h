@@ -266,7 +266,7 @@ UINT8 x64_hook_install(x64_Hook_Handle *handle) {
                 X64_HOOK_ASSERT(ok);
 
                 // Since we modify the code in memory, the CPU cannot detect the change, and may execute the old code it cached.
-                FlushInstructionCache(GetCurrentProcess(), hook->original, hook->num_stolen_bytes);
+                FlushInstructionCache(GetCurrentProcess(), hook->original, sizeof(Jump_Relative));
             }
     
             x64_hook_suspend_or_resume_all_other_threads(handle, 0);
@@ -312,7 +312,7 @@ UINT8 x64_hook_uninstall(x64_Hook_Handle *handle) {
                 *hook->trampoline = hook->original;
 
                 // Since we modify the code in memory, the CPU cannot detect the change, and may execute the old code it cached.
-                FlushInstructionCache(GetCurrentProcess(), hook->original, hook->num_stolen_bytes);
+                FlushInstructionCache(GetCurrentProcess(), hook->original, sizeof(Jump_Relative));
             }
 
             x64_hook_suspend_or_resume_all_other_threads(handle, 0);
@@ -410,7 +410,6 @@ void x64_hook_exit_lock(x64_Hook_Lock *lock) {
     }
 
 void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 length) {
-    // @Robustness: We should assert that we are in range.
     void *rel_address = (void *)(dst + offset);
     INT64 adjustment = src - dst;
 
