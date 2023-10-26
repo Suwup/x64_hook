@@ -1,5 +1,5 @@
 // Compiled with:
-// cl /O2 example.c -WX -Wall -wd4710 -wd5045 /link bddisasm.lib
+// cl /O2 example.c -WX -Wall -wd4710 /link bddisasm.lib
 
 #pragma warning(push, 0)
 #include <assert.h>
@@ -11,8 +11,9 @@
 // Just so we don't have to set the include path for the example.
 #define X64_HOOK_BDDISASM_ALREADY_INCLUDED
 
-#define X64_HOOK_ASSERT(x) assert(x)
 #define X64_HOOK_DEBUG 1
+#define X64_HOOK_PRINTF(...) printf(__VA_ARGS__)
+#define X64_HOOK_ASSERT(x) assert(x)
 
 #include "x64_hook.h"
 
