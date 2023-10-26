@@ -78,6 +78,7 @@ typedef struct {
     UINT8 *stolen_bytes;
     UINT32 num_stolen_bytes;
 
+    UINT8 *dummy_trampoline;
     UINT8 **trampoline;
     UINT8 *original;
     UINT8 *hook; // @Cleanup: Is this even needed?
@@ -194,6 +195,11 @@ UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, vo
         hook->hook       = (UINT8 *)in_hook;
         hook->trampoline = (UINT8 **)in_trampoline;
         hook->relay      = x64_hook_allocate_executable_within_32_bit_address_space(hook->original, sizeof(Jump_Absolute));
+
+        // We always need to have a trampoline, for threading reasons.
+        if (!hook->trampoline) {
+            hook->trampoline = &hook->dummy_trampoline;
+        }
     
         X64_HOOK_ASSERT(hook->original);
         X64_HOOK_ASSERT(hook->hook);
@@ -213,33 +219,30 @@ UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, vo
         hook->stolen_bytes = (UINT8 *)VirtualAlloc(NULL, hook->num_stolen_bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         memcpy(hook->stolen_bytes, hook->original, hook->num_stolen_bytes);
 
-        if (hook->trampoline) {
-            *hook->trampoline = x64_hook_allocate_executable_within_32_bit_address_space(hook->original, hook->num_stolen_bytes + sizeof(Jump_Absolute));
-            memcpy(*hook->trampoline, hook->stolen_bytes, hook->num_stolen_bytes);
+        *hook->trampoline = x64_hook_allocate_executable_within_32_bit_address_space(hook->original, hook->num_stolen_bytes + sizeof(Jump_Absolute));
+        memcpy(*hook->trampoline, hook->stolen_bytes, hook->num_stolen_bytes);
 
-            UINT32 count = 0;
-            while (count < hook->num_stolen_bytes) {
-                NDSTATUS status = NdDecode(&instruction, *hook->trampoline + count, ND_CODE_64, ND_DATA_64);
-                X64_HOOK_ASSERT(ND_SUCCESS(status));
+        UINT32 count = 0;
+        while (count < hook->num_stolen_bytes) {
+            NDSTATUS status = NdDecode(&instruction, *hook->trampoline + count, ND_CODE_64, ND_DATA_64);
+            X64_HOOK_ASSERT(ND_SUCCESS(status));
 
-                if (instruction.IsRipRelative) {
-                    X64_HOOK_ASSERT(instruction.HasDisp || instruction.HasRelOffs);
+            if (instruction.IsRipRelative) {
+                X64_HOOK_ASSERT(instruction.HasDisp || instruction.HasRelOffs);
 
-                    if (instruction.HasDisp) {
-                        x64_hook_relocate_relative(hook->original, *hook->trampoline, count + instruction.DispOffset, instruction.DispLength);
-                    }
-
-                    if (instruction.HasRelOffs) {
-                        x64_hook_relocate_relative(hook->original, *hook->trampoline, count + instruction.RelOffsOffset, instruction.RelOffsLength);
-                    }
+                if (instruction.HasDisp) {
+                    x64_hook_relocate_relative(hook->original, *hook->trampoline, count + instruction.DispOffset, instruction.DispLength);
                 }
 
-                count += instruction.Length;
+                if (instruction.HasRelOffs) {
+                    x64_hook_relocate_relative(hook->original, *hook->trampoline, count + instruction.RelOffsOffset, instruction.RelOffsLength);
+                }
             }
 
-            x64_hook_place_jump_absolute(*hook->trampoline + count, hook->original + count);
+            count += instruction.Length;
         }
 
+        x64_hook_place_jump_absolute(*hook->trampoline + count, hook->original + count);
         result = 1;
     }
 
