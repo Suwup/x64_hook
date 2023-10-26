@@ -89,7 +89,7 @@ typedef struct {
     UINT8 *dummy_trampoline;
     UINT8 **trampoline;
     UINT8 *original;
-    UINT8 *hook; // @Cleanup: Is this even needed?
+    UINT8 *hook;
     UINT8 *relay;
 } x64_Hook;
 
