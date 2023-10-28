@@ -385,10 +385,10 @@ UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking) {
 #endif
     
     if (blocking) {
-        UINT8 wait = 0;
+        UINT8 wait = 1;
         
         while (_InterlockedCompareExchange(&lock->lock, 1, 0)) {
-            for (UINT8 i = 0; i <= wait; i++) _mm_pause();
+            for (UINT8 i = 1; i <= wait; i++) _mm_pause();
             if (wait != 16) wait <<= 1;
         }
 
