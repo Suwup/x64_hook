@@ -439,41 +439,45 @@ void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 len
 #undef X64_HOOK_ASSERT_SIGNED_INTEGER_ADD
 
 void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle, HANDLE thread) {
-    CONTEXT context;
-    context.ContextFlags = CONTEXT_CONTROL;
+    if (handle) {
+        CONTEXT context;
+        context.ContextFlags = CONTEXT_CONTROL;
     
-    BOOL ok = GetThreadContext(thread, &context);
-    X64_HOOK_ASSERT(ok);
-
-    UINT8 *old_instruction_pointer = (UINT8 *)context.Rip;
-    UINT8 *new_instruction_pointer = NULL;
-    
-    for (INT32 i = 0; i < handle->num_hooks; i++) {
-        x64_Hook *hook = handle->hooks + i;
-        if (hook->original <= old_instruction_pointer && old_instruction_pointer < hook->original + hook->num_stolen_bytes) {
-            X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from original to trampoline\n");
-            new_instruction_pointer = *hook->trampoline + (old_instruction_pointer - hook->original);
-            break;
-        }
-
-        if (hook->relay == old_instruction_pointer) {
-            X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from relay to original\n");
-            new_instruction_pointer = hook->original;
-            break;
-        }
-
-        // Less than or equal since we might be at the jump instruction, after the stolen bytes.
-        if (*hook->trampoline <= old_instruction_pointer && old_instruction_pointer <= *hook->trampoline + hook->num_stolen_bytes) {
-            X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from trampoline to original\n");
-            new_instruction_pointer = hook->original + (old_instruction_pointer - *hook->trampoline);
-            break;
-        }
-    }
-
-    if (new_instruction_pointer) {
-        context.Rip = (UINT64)new_instruction_pointer;
-        ok = SetThreadContext(thread, &context);
+        BOOL ok = GetThreadContext(thread, &context);
         X64_HOOK_ASSERT(ok);
+
+        UINT8 *old_instruction_pointer = (UINT8 *)context.Rip;
+        UINT8 *new_instruction_pointer = NULL;
+    
+        for (INT32 i = 0; i < handle->num_hooks; i++) {
+            x64_Hook *hook = handle->hooks + i;
+            if (hook->original <= old_instruction_pointer && old_instruction_pointer < hook->original + hook->num_stolen_bytes) {
+                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from original to trampoline\n");
+                new_instruction_pointer = *hook->trampoline + (old_instruction_pointer - hook->original);
+                break;
+            }
+
+            if (hook->relay == old_instruction_pointer) {
+                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from relay to original\n");
+                new_instruction_pointer = hook->original;
+                break;
+            }
+
+            // Less than or equal since we might be at the jump instruction, after the stolen bytes.
+            if (*hook->trampoline <= old_instruction_pointer && old_instruction_pointer <= *hook->trampoline + hook->num_stolen_bytes) {
+                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from trampoline to original\n");
+                new_instruction_pointer = hook->original + (old_instruction_pointer - *hook->trampoline);
+                break;
+            }
+        }
+
+        if (new_instruction_pointer) {
+            context.Rip = (UINT64)new_instruction_pointer;
+            ok = SetThreadContext(thread, &context);
+            X64_HOOK_ASSERT(ok);
+        }
+    } else {
+        X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> hook handle was null, doing nothing\n");
     }
 }
 
