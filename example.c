@@ -4,12 +4,7 @@
 #pragma warning(push, 0)
 #include <assert.h>
 #include <stdio.h>
-
-#include "bddisasm/bddisasm.h"
 #pragma warning(pop)
-
-// Just so we don't have to set the include path for the example.
-#define X64_HOOK_BDDISASM_ALREADY_INCLUDED
 
 #define X64_HOOK_DEBUG 1
 #define X64_HOOK_PRINTF(...) printf(__VA_ARGS__)
