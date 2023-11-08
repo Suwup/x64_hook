@@ -1,5 +1,5 @@
 // Compiled with:
-// cl /O2 example.c -WX -Wall -wd4710 /link bddisasm.lib
+// cl /nologo /O2 example.c -WX -Wall -wd4710 /I. /link bddisasm.lib
 
 #pragma warning(push, 0)
 #include <assert.h>

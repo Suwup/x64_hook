@@ -36,15 +36,8 @@
 #pragma warning(push, 0)
 #include <windows.h>
 #include <tlhelp32.h>
-
-#ifndef X64_HOOK_BDDISASM_ALREADY_INCLUDED
 #include <bddisasm/bddisasm.h>
-#endif
 #pragma warning(pop)
-
-#ifndef X64_HOOK_BDDISASM_NO_DEFAULT_MEMSET
-EXTERN_C void* nd_memset(void *s, int c, size_t n) {return memset(s,c,n);}
-#endif
 
 #pragma warning(push)
 #pragma warning(disable: 4100) // Unreferenced parameter.
@@ -125,46 +118,48 @@ typedef struct {
 // anything while doing this or you will run into thread-safety issues.
 //
 
-x64_Hook_Handle *x64_hook_allocate(void);
-UINT8 x64_hook_free(x64_Hook_Handle *handle);
+static x64_Hook_Handle *x64_hook_allocate(void);
+static UINT8 x64_hook_free(x64_Hook_Handle *handle);
 
 // There is no _remove on purpose, just allocate another handle in that case.
-UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, void **in_trampoline);
+static UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, void **in_trampoline);
 
-UINT8 x64_hook_install(x64_Hook_Handle *handle);
-UINT8 x64_hook_uninstall(x64_Hook_Handle *handle);
+static UINT8 x64_hook_install(x64_Hook_Handle *handle);
+static UINT8 x64_hook_uninstall(x64_Hook_Handle *handle);
 
 //
 // Internal api's, mainly meant to be used in a specific context by the user api's,
 // however you may use them for other things, if you know what you are doing.
 //
 
-void x64_hook_place_jump_absolute(UINT8 *src, UINT8 *dst);
-UINT8 x64_hook_place_jump_relative(UINT8 *src, UINT8 *dst);
+static void x64_hook_place_jump_absolute(UINT8 *src, UINT8 *dst);
+static UINT8 x64_hook_place_jump_relative(UINT8 *src, UINT8 *dst);
 
-UINT8 x64_hook_protect(UINT8 *address, UINT64 size, volatile UINT32 *old_protection);
+static UINT8 x64_hook_protect(UINT8 *address, UINT64 size, volatile UINT32 *old_protection);
 
 // Feel free to use these for general synchronization,
 // where a lock-free queue is not really possible.
 
-UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking);
-void x64_hook_exit_lock(x64_Hook_Lock *lock);
+static UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking);
+static void x64_hook_exit_lock(x64_Hook_Lock *lock);
 
-void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 length);
-void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle, HANDLE thread);
-UINT8 *x64_hook_allocate_executable_within_32_bit_address_space(UINT8 *address, UINT64 size);
-void x64_hook_suspend_or_resume_all_other_threads(x64_Hook_Handle *handle, UINT8 suspend);
+static void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 length);
+static void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle, HANDLE thread);
+static UINT8 *x64_hook_allocate_executable_within_32_bit_address_space(UINT8 *address, UINT64 size);
+static void x64_hook_suspend_or_resume_all_other_threads(x64_Hook_Handle *handle, UINT8 suspend);
 
 //
 // Start of implementation.
 //
 
+static
 x64_Hook_Handle *x64_hook_allocate(void) {
     x64_Hook_Handle *handle = (x64_Hook_Handle *)VirtualAlloc(NULL, sizeof(x64_Hook_Handle), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     X64_HOOK_ASSERT(handle);
     return handle;
 }
 
+static
 UINT8 x64_hook_free(x64_Hook_Handle *handle) {
     X64_HOOK_ASSERT(handle);
 
@@ -182,7 +177,7 @@ UINT8 x64_hook_free(x64_Hook_Handle *handle) {
         VirtualFree(handle, 0, MEM_RELEASE);
         result = 1;
     } else {
-        X64_HOOK_PRINTF("x64_hook_free() -> error: hooks where never uninstalled\n");
+        X64_HOOK_PRINTF("x64_hook_free() -> error: hooks were never uninstalled\n");
         x64_hook_exit_lock(&handle->install_lock);
     }
 
@@ -190,6 +185,7 @@ UINT8 x64_hook_free(x64_Hook_Handle *handle) {
 }
 
 // It's not safe to uninstall while adding on another thread, don't do that, that's just retarded.
+static
 UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, void **in_trampoline) {
     UINT8 result = 0;
     
@@ -255,6 +251,7 @@ UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, vo
     return result;
 }
 
+static
 UINT8 x64_hook_install(x64_Hook_Handle *handle) {
     UINT8 result = 0;
     UINT8 ok = x64_hook_enter_lock(&handle->install_lock, 0);
@@ -299,6 +296,7 @@ UINT8 x64_hook_install(x64_Hook_Handle *handle) {
     return result;
 }
 
+static
 UINT8 x64_hook_uninstall(x64_Hook_Handle *handle) {
     UINT8 result = 0;
     UINT8 ok = x64_hook_enter_lock(&handle->install_lock, 0);
@@ -348,6 +346,7 @@ UINT8 x64_hook_uninstall(x64_Hook_Handle *handle) {
     return result;
 }
 
+static
 void x64_hook_place_jump_absolute(UINT8 *src, UINT8 *dst) {
     Jump_Absolute *jump = (Jump_Absolute *)src;
     jump->operand_1 = 0xFF;
@@ -356,6 +355,7 @@ void x64_hook_place_jump_absolute(UINT8 *src, UINT8 *dst) {
     jump->next = (UINT64)dst;
 }
 
+static
 UINT8 x64_hook_place_jump_relative(UINT8 *src, UINT8 *dst) {
     UINT8 result = 0;
     
@@ -370,12 +370,14 @@ UINT8 x64_hook_place_jump_relative(UINT8 *src, UINT8 *dst) {
     return result;
 }
 
+static
 UINT8 x64_hook_protect(UINT8 *address, UINT64 size, volatile UINT32 *old_protection) {
     // We need to set the PAGE_EXECUTE_READWRITE protection or we will get an DEP fault in optimized builds.
     UINT8 result = VirtualProtect(address, size, *old_protection ? *old_protection : PAGE_EXECUTE_READWRITE, (DWORD *)old_protection) != 0;
     return result;
 }
 
+static
 UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking) {
     UINT8 result = 0;
 
@@ -385,10 +387,10 @@ UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking) {
 #endif
     
     if (blocking) {
-        UINT8 wait = 0;
+        UINT8 wait = 1;
         
         while (_InterlockedCompareExchange(&lock->lock, 1, 0)) {
-            for (UINT8 i = 0; i <= wait; i++) _mm_pause();
+            for (UINT8 i = 1; i <= wait; i++) _mm_pause();
             if (wait != 16) wait <<= 1;
         }
 
@@ -406,6 +408,7 @@ UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking) {
     return result;
 }
 
+static
 void x64_hook_exit_lock(x64_Hook_Lock *lock) {
 #if X64_HOOK_DEBUG
     UINT32 thread_id = GetCurrentThreadId();
@@ -424,6 +427,7 @@ void x64_hook_exit_lock(x64_Hook_Lock *lock) {
         *(INT##width  *)dst += (INT##width)src;                         \
     }
 
+static
 void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 length) {
     void *rel_address = (void *)(dst + offset);
     INT64 adjustment = src - dst;
@@ -438,6 +442,7 @@ void x64_hook_relocate_relative(UINT8 *src, UINT8 *dst, UINT32 offset, UINT8 len
 // This is a very specific macro, not needed anywhere else...
 #undef X64_HOOK_ASSERT_SIGNED_INTEGER_ADD
 
+static
 void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle, HANDLE thread) {
     if (handle) {
         CONTEXT context;
@@ -481,6 +486,7 @@ void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle,
     }
 }
 
+static
 UINT8 *x64_hook_allocate_executable_within_32_bit_address_space(UINT8 *address, UINT64 size) {
     if (!address || !size) return NULL;
     
@@ -510,6 +516,7 @@ UINT8 *x64_hook_allocate_executable_within_32_bit_address_space(UINT8 *address, 
     return NULL;
 }
 
+static
 void x64_hook_suspend_or_resume_all_other_threads(x64_Hook_Handle *handle, UINT8 suspend) {
     HANDLE thread_snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     X64_HOOK_ASSERT(thread_snapshot != INVALID_HANDLE_VALUE);
@@ -528,23 +535,26 @@ void x64_hook_suspend_or_resume_all_other_threads(x64_Hook_Handle *handle, UINT8
             if (suspend) access |= THREAD_GET_CONTEXT | THREAD_SET_CONTEXT;
             
             HANDLE thread = OpenThread(access, 0, thread_entry.th32ThreadID);
-            X64_HOOK_ASSERT(thread);
-            
-            if (suspend) {
-                UINT8 is_suspended = SuspendThread(thread) > 0;
-                X64_HOOK_ASSERT(!is_suspended);
-                
-                x64_hook_maybe_relocate_thread_instruction_pointer(handle, thread);
-            } else {
-                UINT8 was_suspended = ResumeThread(thread) == 1;
-                X64_HOOK_ASSERT(was_suspended);
+            if (thread) {
+                if (suspend) {
+                    if (SuspendThread(thread) <= 0) {
+                        x64_hook_maybe_relocate_thread_instruction_pointer(handle, thread);
+                    } 
+                } else {
+                    ResumeThread(thread);
+                }
+
+                CloseHandle(thread);
             }
-            
-            CloseHandle(thread);
         }
     } while (Thread32Next(thread_snapshot, &thread_entry));
 
     CloseHandle(thread_snapshot);
+}
+
+// We need to implement this for bddisasm.
+EXTERN_C void* nd_memset(void *s, int c, size_t n) {
+    return memset(s, c, n);
 }
 
 #pragma warning(pop)
