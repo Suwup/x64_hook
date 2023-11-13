@@ -44,6 +44,7 @@
 #pragma warning(disable: 4189) // Unreferenced variable.
 #pragma warning(disable: 4820) // Padding in struct.
 #pragma warning(disable: 4711) // Automatic inline expansion.
+#pragma warning(disable: 5045) // Compiler will insert Spectre mitigation.
 
 #ifndef X64_HOOK_MAX_HOOKS
 #define X64_HOOK_MAX_HOOKS 32
@@ -190,7 +191,7 @@ UINT8 x64_hook_add(x64_Hook_Handle *handle, void *in_original, void *in_hook, vo
     UINT8 result = 0;
     
     if (!handle->installed) {
-        INT32 index = _InterlockedIncrement((volatile LONG *)&handle->num_hooks) - 1;
+        INT32 index = InterlockedIncrement((volatile LONG *)&handle->num_hooks) - 1;
         X64_HOOK_ASSERT(index != X64_HOOK_MAX_HOOKS);
 
         x64_Hook *hook   = handle->hooks + index;
@@ -389,14 +390,14 @@ UINT8 x64_hook_enter_lock(x64_Hook_Lock *lock, UINT8 blocking) {
     if (blocking) {
         UINT8 wait = 1;
         
-        while (_InterlockedCompareExchange(&lock->lock, 1, 0)) {
+        while (InterlockedCompareExchange(&lock->lock, 1, 0)) {
             for (UINT8 i = 1; i <= wait; i++) _mm_pause();
             if (wait != 16) wait <<= 1;
         }
 
         result = 1;
     } else {
-        result = (UINT8)_InterlockedCompareExchange(&lock->lock, 1, 0) == 0;
+        result = (UINT8)InterlockedCompareExchange(&lock->lock, 1, 0) == 0;
     }
     
 #if X64_HOOK_DEBUG
