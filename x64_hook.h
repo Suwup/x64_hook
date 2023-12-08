@@ -25,6 +25,8 @@
 #ifndef X64_HOOK_H
 #define X64_HOOK_H
 
+#define X64_HOOK_VERSION 1
+
 #ifndef WIN32_MEAN_AND_LEAN
 #define WIN32_MEAN_AND_LEAN
 #endif
@@ -56,14 +58,6 @@
 
 #ifndef X64_HOOK_DEBUG
 #define X64_HOOK_DEBUG 0
-#endif
-
-#if !X64_HOOK_DEBUG
-#undef X64_HOOK_PRINTF
-#endif
-
-#ifndef X64_HOOK_PRINTF
-#define X64_HOOK_PRINTF(...)
 #endif
 
 #define X64_HOOK_MIN_SIGNED(x) (-((INT64)1 << ((INT64)(x) - 1)) - 0)
@@ -178,7 +172,6 @@ UINT8 x64_hook_free(x64_Hook_Handle *handle) {
         VirtualFree(handle, 0, MEM_RELEASE);
         result = 1;
     } else {
-        X64_HOOK_PRINTF("x64_hook_free() -> error: hooks were never uninstalled\n");
         x64_hook_exit_lock(&handle->install_lock);
     }
 
@@ -278,8 +271,6 @@ UINT8 x64_hook_install(x64_Hook_Handle *handle) {
     
             x64_hook_suspend_or_resume_all_other_threads(handle, 0);
             handle->installed = 1;
-        } else {
-            X64_HOOK_PRINTF("x64_hook_install() -> hooks are already installed\n");
         }
 
         result = 1;
@@ -290,7 +281,6 @@ UINT8 x64_hook_install(x64_Hook_Handle *handle) {
         
         x64_hook_enter_lock(&handle->install_lock, 1);
         result = handle->installed == 1;
-        X64_HOOK_PRINTF("x64_hook_install() -> we had to wait for the install lock, where we installed: %u\n", result);
         x64_hook_exit_lock(&handle->install_lock);
     }
 
@@ -328,8 +318,6 @@ UINT8 x64_hook_uninstall(x64_Hook_Handle *handle) {
 
             x64_hook_suspend_or_resume_all_other_threads(handle, 0);
             handle->installed = 0;
-        } else {
-            X64_HOOK_PRINTF("x64_hook_uninstall() -> hooks are already uninstalled\n");
         }
 
         result = 1;
@@ -340,7 +328,6 @@ UINT8 x64_hook_uninstall(x64_Hook_Handle *handle) {
         
         x64_hook_enter_lock(&handle->install_lock, 1);
         result = handle->installed == 0;
-        X64_HOOK_PRINTF("x64_hook_uninstall() -> we had to wait for the install lock, where we uninstalled: %u\n", result);
         x64_hook_exit_lock(&handle->install_lock);
     }
 
@@ -458,20 +445,17 @@ void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle,
         for (INT32 i = 0; i < handle->num_hooks; i++) {
             x64_Hook *hook = handle->hooks + i;
             if (hook->original <= old_instruction_pointer && old_instruction_pointer < hook->original + hook->num_stolen_bytes) {
-                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from original to trampoline\n");
                 new_instruction_pointer = *hook->trampoline + (old_instruction_pointer - hook->original);
                 break;
             }
 
             if (hook->relay == old_instruction_pointer) {
-                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from relay to original\n");
                 new_instruction_pointer = hook->original;
                 break;
             }
 
             // Less than or equal since we might be at the jump instruction, after the stolen bytes.
             if (*hook->trampoline <= old_instruction_pointer && old_instruction_pointer <= *hook->trampoline + hook->num_stolen_bytes) {
-                X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> relocating instruction pointer from trampoline to original\n");
                 new_instruction_pointer = hook->original + (old_instruction_pointer - *hook->trampoline);
                 break;
             }
@@ -482,8 +466,6 @@ void x64_hook_maybe_relocate_thread_instruction_pointer(x64_Hook_Handle *handle,
             ok = SetThreadContext(thread, &context);
             X64_HOOK_ASSERT(ok);
         }
-    } else {
-        X64_HOOK_PRINTF("x64_hook_maybe_relocate_thread_instruction_pointer() -> hook handle was null, doing nothing\n");
     }
 }
 
@@ -538,7 +520,7 @@ void x64_hook_suspend_or_resume_all_other_threads(x64_Hook_Handle *handle, UINT8
             HANDLE thread = OpenThread(access, 0, thread_entry.th32ThreadID);
             if (thread) {
                 if (suspend) {
-                    if (SuspendThread(thread) <= 0) {
+                    if (SuspendThread(thread) != 0xFFFFFFFF) {
                         x64_hook_maybe_relocate_thread_instruction_pointer(handle, thread);
                     } 
                 } else {
