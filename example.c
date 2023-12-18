@@ -1,14 +1,21 @@
 // Compiled with:
 // cl /nologo /O2 example.c -WX -Wall -wd4710 /I. /link bddisasm.lib
+//
+// Correct output:
+//
+// original
+// hook
+// original
+// original
+//
 
 #pragma warning(push, 0)
 #include <assert.h>
 #include <stdio.h>
 #pragma warning(pop)
 
-#define X64_HOOK_DEBUG 1
-#define X64_HOOK_PRINTF(...) printf(__VA_ARGS__)
 #define X64_HOOK_ASSERT(x) assert(x)
+#define X64_HOOK_IMPLEMENTATION
 
 #include "x64_hook.h"
 
@@ -26,17 +33,13 @@ void hook(void) {
 int main(void) {
     x64_Hook_Handle *handle = x64_hook_allocate();
     if (x64_hook_add(handle, (void *)original, (void *)hook, (void **)&trampoline)) {
-        if (x64_hook_install(handle)) {
-            original();
-            hook();
-            trampoline();
-
-            if (!x64_hook_uninstall(handle)) {
-                printf("Failed to uninstall hooks!\n");
-            }
-        } else {
-            printf("Failed to install hooks!\n");
-        }
+        x64_hook_install(handle);
+        
+        original();
+        hook();
+        trampoline();
+        
+        x64_hook_uninstall(handle);
     } else {
         printf("Failed to hook!\n");
     }
