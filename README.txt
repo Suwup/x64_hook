@@ -1,7 +1,7 @@
 In order to use this library, all you need to do is to have the bddisasm folder in your include path.
 You also need to link with the latest version of bddisasm.lib, that you will find under the releases
 
-You can find both of these over at https://github.com/bitdefender/bddisasm, this library was built and tested on v1.37.0 however the latest version should *probably* always work perfectly.
+You can find both of these over at https://github.com/bitdefender/bddisasm, this library was built and tested on v2.1.0 however the latest version should _probably_ always work perfectly.
 
 Where you want to include the implementation of the library, pound-define X64_HOOK_IMPLEMENTATION.
 
